@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Práctica DS - 2do parcial</title>
+<style>
+:root{--bg:#fff;--fg:#1c1c1e;--mut:#6b6b73;--card:#f4f4f6;--bd:#d6d6dc;--ok:#1e7d3a;--okbg:#e2f4e7;--bad:#b3261e;--badbg:#fbe3e1;--ac:#3355cc;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#16161a;--fg:#ececf0;--mut:#9a9aa5;--card:#222228;--bd:#3a3a44;--ok:#6fd58d;--okbg:#1c3a27;--bad:#ff8a80;--badbg:#44211f;--ac:#8aa4ff}}
+:root[data-theme="dark"]{--bg:#16161a;--fg:#ececf0;--mut:#9a9aa5;--card:#222228;--bd:#3a3a44;--ok:#6fd58d;--okbg:#1c3a27;--bad:#ff8a80;--badbg:#44211f;--ac:#8aa4ff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:760px;margin:0 auto;padding:16px}
+h1{font-size:1.3rem;margin:.2em 0}
+textarea{width:100%;height:180px;background:var(--card);color:var(--fg);border:1px solid var(--bd);border-radius:8px;padding:10px;font:13px monospace}
+button{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:10px 16px;font-size:1rem;cursor:pointer;margin:4px 6px 4px 0}
+button.s{background:var(--card);color:var(--fg);border:1px solid var(--bd)}
+input[type=number]{width:80px;background:var(--card);color:var(--fg);border:1px solid var(--bd);border-radius:6px;padding:6px}
+.row{margin:10px 0;color:var(--mut)}
+.q{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;margin:14px 0}
+.q h3{font-size:1rem;margin:0 0 4px}
+.t{font-size:.8rem;color:var(--mut);margin-bottom:8px}
+.o{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--bd);border-radius:8px;margin:6px 0;cursor:pointer;background:var(--bg)}
+.o input{margin-top:4px;transform:scale(1.2)}
+.o.c{border-color:var(--ok);background:var(--okbg)}
+.o.w{border-color:var(--bad);background:var(--badbg)}
+.q.good{border-left:5px solid var(--ok)}.q.bad{border-left:5px solid var(--bad)}
+#bar{position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);padding:8px 0;border-bottom:1px solid var(--bd);z-index:2}
+.hide{display:none}
+</style></head>
+<body><main>
+<h1>Práctica DS – 2do parcial</h1>
+<section id="setup">
+<p class="row">Pegá acá las preguntas tal cual las copiaste del chat (con "Tema" y "Correctas"). Se guardan en este navegador.</p>
+<textarea id="txt" placeholder="**1. Pregunta...**&#10;- a) Opción&#10;- b) Opción&#10;**Tema:** ...&#10;**Correctas:** a, b"></textarea>
+<div class="row">Cantidad de preguntas (vacío = todas): <input type="number" id="n" min="1">
+<label><input type="checkbox" id="sq" checked> mezclar preguntas</label></div>
+<button id="go">Empezar</button><span id="msg" class="row"></span>
+</section>
+<section id="quizwrap" class="hide">
+<div id="bar"><button id="chk">Corregir</button><button class="s" id="back">Volver</button>
+<button class="s hide" id="again">Repetir (nuevo orden)</button><button class="s hide" id="wrong">Solo las falladas</button>
+<strong id="score"></strong></div>
+<div id="quiz"></div>
+</section>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+let ALL=[],cur=[];
+const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const sh=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const clean=s=>s.replace(/\*+/g,'').trim();
+function parse(t){
+  const out=[];let q=null;
+  for(let raw of t.split(/\r?\n/)){
+    const l=raw.trim();if(!l)continue;
+    let m;
+    if((m=l.match(/^\**\s*(\d+)\.\s+(.+)$/))&&!/^[-•]/.test(l)){q={id:+m[1],text:clean(m[2]),opts:[],ok:[],tema:''};continue}
+    if(!q)continue;
+    if((m=l.match(/^[-•*]?\s*([a-z])\)\s+(.+)$/i))){q.opts.push({k:m[1].toLowerCase(),t:clean(m[2])});continue}
+    if((m=l.match(/^\**\s*Tema:?\**:?\s*(.+)$/i))){q.tema=clean(m[1]);continue}
+    if((m=l.match(/^\**\s*Correctas?:?\**:?\s*(.+)$/i))){
+      q.ok=clean(m[1]).toLowerCase().split(/[^a-z]+/).filter(Boolean);
+      if(q.opts.length>1&&q.ok.length)out.push(q);q=null}
+  }
+  return out;
+}
+try{const s=localStorage.getItem('dsq');if(s)$('#txt').value=s}catch(e){}
+function start(list){
+  cur=list.map(q=>({...q,opts:sh(q.opts)}));
+  if($('#sq').checked)cur=sh(cur);
+  const n=parseInt($('#n').value);if(n>0)cur=cur.slice(0,n);
+  render();
+}
+function render(){
+  $('#setup').classList.add('hide');$('#quizwrap').classList.remove('hide');
+  ['#again','#wrong'].forEach(i=>$(i).classList.add('hide'));$('#chk').classList.remove('hide');$('#score').textContent='';
+  $('#quiz').innerHTML=cur.map((q,i)=>`<div class="q" id="q${i}"><h3>${i+1}. ${esc(q.text)}</h3><div class="t">${esc(q.tema)} · marcá todas las correctas</div>`+
+    q.opts.map(o=>`<label class="o" data-k="${o.k}"><input type="checkbox"><span>${esc(o.t)}</span></label>`).join('')+'</div>').join('');
+  scrollTo(0,0);
+}
+$('#go').onclick=()=>{
+  const t=$('#txt').value;ALL=parse(t);
+  if(!ALL.length){$('#msg').textContent='No pude leer preguntas. Revisá el formato.';return}
+  try{localStorage.setItem('dsq',t)}catch(e){}
+  start(ALL);
+};
+$('#back').onclick=()=>{$('#quizwrap').classList.add('hide');$('#setup').classList.remove('hide');$('#msg').textContent=ALL.length+' preguntas cargadas'};
+let wrongList=[];
+$('#chk').onclick=()=>{
+  let ok=0;wrongList=[];
+  cur.forEach((q,i)=>{
+    const box=$('#q'+i),labs=[...box.querySelectorAll('.o')];
+    const sel=labs.filter(l=>l.querySelector('input').checked).map(l=>l.dataset.k).sort();
+    const good=[...q.ok].sort();
+    const right=sel.length===good.length&&sel.every((k,j)=>k===good[j]);
+    labs.forEach(l=>{const isC=q.ok.includes(l.dataset.k),isS=l.querySelector('input').checked;
+      l.querySelector('input').disabled=true;
+      if(isC)l.classList.add('c');else if(isS)l.classList.add('w')});
+    box.classList.add(right?'good':'bad');
+    if(right)ok++;else wrongList.push(q);
+  });
+  $('#score').textContent=`${ok}/${cur.length} (${Math.round(ok/cur.length*100)}%)`;
+  $('#chk').classList.add('hide');$('#again').classList.remove('hide');
+  if(wrongList.length)$('#wrong').classList.remove('hide');
+  scrollTo(0,0);
+};
+$('#again').onclick=()=>start(cur);
+$('#wrong').onclick=()=>{const c=wrongList;cur=c.map(q=>({...q,opts:sh(q.opts)}));render()};
+</script></body></html>
